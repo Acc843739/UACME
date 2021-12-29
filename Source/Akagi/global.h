@@ -4,9 +4,9 @@
 *
 *  TITLE:       GLOBAL.H
 *
-*  VERSION:     3.55
+*  VERSION:     3.58
 *
-*  DATE:        11 Mar 2021
+*  DATE:        01 Dec 2021
 *
 *  Common header file for the program support routines.
 *
@@ -22,10 +22,6 @@
 #error ANSI build is not supported
 #endif
 
-#ifndef _DEBUG
-#define KUMA_STUB
-#endif
-
 #include "shared\libinc.h"
 
 //disable nonmeaningful warnings.
@@ -37,10 +33,11 @@
 #pragma warning(disable: 6258) // Using TerminateThread does not allow proper thread clean up
 #pragma warning(disable: 6320) // exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER
 #pragma warning(disable: 6255 6263)  // alloca
+#pragma warning(disable: 28159)
 
 #define PAYLOAD_ID_NONE MAXDWORD
 
-#define USER_REQUESTS_AUTOAPPROVED TRUE //auto approve any asking dialogs
+#define USER_REQUESTS_AUTOAPPROVED FALSE //auto approve any asking dialogs
 
 #define SECRETS_ID IDR_SECRETS
 
@@ -64,6 +61,7 @@
 #include <wintrust.h>
 #include <taskschd.h>
 #pragma comment(lib, "taskschd.lib")
+#pragma comment(lib, "rpcrt4.lib")
 
 #pragma warning(push)
 #pragma warning(disable: 4115) //named type definition in parentheses
@@ -71,7 +69,8 @@
 #pragma warning(pop)
 
 #include "shared\hde\hde64.h"
-#include "shared\ntos.h"
+#include "shared\ntos\ntos.h"
+#include "shared\ntos\ntbuilds.h"
 #include "shared\minirtl.h"
 #include "shared\cmdline.h"
 #include "shared\_filename.h"
@@ -79,6 +78,7 @@
 #include "shared\windefend.h"
 #include "shared\consts.h"
 #include "sup.h"
+#include "fusutil.h"
 #include "compress.h"
 #include "aic.h"
 #include "stub.h"
@@ -96,12 +96,6 @@ typedef struct _UACME_SHARED_CONTEXT {
     HANDLE hCompletionEvent;
 } UACME_SHARED_CONTEXT, *PUACME_SHARED_CONTEXT;
 
-typedef struct _UACME_FUSION_CONTEXT {
-    BOOL Initialized;
-    HINSTANCE hFusion;
-    pfnCreateAssemblyCache CreateAssemblyCache;
-} UACME_FUSION_CONTEXT, * PUACME_FUSION_CONTEXT;
-
 typedef struct _UACME_CONTEXT {
     BOOLEAN                 IsWow64;
     BOOLEAN                 UserRequestsAutoApprove;
@@ -110,16 +104,32 @@ typedef struct _UACME_CONTEXT {
     ULONG                   dwBuildNumber;
     ULONG                   AkagiFlag;
     ULONG                   IFileOperationFlags;
-    ULONG                   OptionalParameterLength; // Count of characters
+
+    // Count of characters
+    ULONG                   OptionalParameterLength; 
+
     PVOID                   ucmHeap;
     pfnDecompressPayload    DecompressRoutine;
     UACME_FUSION_CONTEXT    FusionContext;
     UACME_SHARED_CONTEXT    SharedContext;
-    WCHAR                   szSystemRoot[MAX_PATH + 1]; // Windows directory with end slash
-    WCHAR                   szSystemDirectory[MAX_PATH + 1];// Windows\System32 directory with end slash
-    WCHAR                   szTempDirectory[MAX_PATH + 1]; // Current user temp directory with end slash
-    WCHAR                   szOptionalParameter[MAX_PATH + 1]; //limited to MAX_PATH
-    WCHAR                   szDefaultPayload[MAX_PATH + 1]; //limited to MAX_PATH
+
+    // Windows directory with end slash
+    WCHAR                   szSystemRoot[MAX_PATH + 1];
+
+    // Windows\System32 directory with end slash
+    WCHAR                   szSystemDirectory[MAX_PATH + 1];
+
+    // Current user temp directory with end slash
+    WCHAR                   szTempDirectory[MAX_PATH + 1];
+
+    // Current program directory with end slash
+    WCHAR                   szCurrentDirectory[MAX_PATH + 1];
+
+    // Optional parameter, limited to MAX_PATH
+    WCHAR                   szOptionalParameter[MAX_PATH + 1]; 
+
+    // Default payload (system32\cmd.exe), limited to MAX_PATH
+    WCHAR                   szDefaultPayload[MAX_PATH + 1]; 
 } UACMECONTEXT, *PUACMECONTEXT;
 
 typedef struct _UACME_PARAM_BLOCK {
@@ -138,14 +148,6 @@ typedef UINT(WINAPI *pfnEntryPoint)(
     _In_opt_ ULONG OptionalParameterLength,
     _In_ BOOL OutputToDebugger
     );
-
-typedef struct _UACME_THREAD_CONTEXT {
-    TEB_ACTIVE_FRAME Frame;
-    pfnEntryPoint ucmMain;
-    NTSTATUS ReturnedResult;
-    ULONG OptionalParameterLength;
-    LPWSTR OptionalParameter;
-} UACME_THREAD_CONTEXT, *PUACME_THREAD_CONTEXT;
 
 extern PUACMECONTEXT g_ctx;
 extern HINSTANCE g_hInstance;

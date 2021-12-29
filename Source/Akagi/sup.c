@@ -4,9 +4,9 @@
 *
 *  TITLE:       SUP.C
 *
-*  VERSION:     3.55
+*  VERSION:     3.58
 *
-*  DATE:        13 Mar 2021
+*  DATE:        01 Dec 2021
 *
 * THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 * ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED
@@ -28,9 +28,34 @@ USER_ASSOC_SIGNATURE* g_UserAssocSignatures[] = {
     &UAS_SIG_18362,
     &UAS_SIG_18363,
     &UAS_SIG_19041,
-    &UAS_SIG_19042,
+    &UAS_SIG_19042_19043,
+    &UAS_SIG_22000,
     &UAS_SIG_VNEXT
 };
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+    _Must_inspect_result_
+        _Ret_maybenull_ _Post_writable_byte_size_(size)
+        void* __RPC_USER MIDL_user_allocate(_In_ size_t size)
+    {
+        return((void __RPC_FAR*) supHeapAlloc(size));
+    }
+
+#pragma warning(push)
+#pragma warning(disable: 6387)
+#pragma warning(disable: 6001)
+    void __RPC_USER MIDL_user_free(_Pre_maybenull_ _Post_invalid_ void* p)
+    {
+        supHeapFree(p);
+    }
+#pragma warning(pop)
+
+#if defined(__cplusplus)
+}
+#endif
 
 /*
 * supEncodePointer
@@ -303,7 +328,7 @@ BOOL supGetElevationType(
 *
 */
 BOOL supWriteBufferToFile(
-    _In_ LPWSTR lpFileName,
+    _In_ LPCWSTR lpFileName,
     _In_opt_ PVOID Buffer,
     _In_ DWORD BufferSize
 )
@@ -340,7 +365,7 @@ BOOL supWriteBufferToFile(
 *
 */
 VOID supDebugPrint(
-    _In_ LPWSTR ApiName,
+    _In_ LPCWSTR ApiName,
     _In_ DWORD status
 )
 {
@@ -490,7 +515,7 @@ NTSTATUS supRegReadValue(
 *
 */
 PBYTE supReadFileToBuffer(
-    _In_ LPWSTR lpFileName,
+    _In_ LPCWSTR lpFileName,
     _Inout_opt_ LPDWORD lpBufferSize
 )
 {
@@ -594,9 +619,9 @@ PBYTE supReadFileToBuffer(
 *
 */
 BOOL supRunProcess2(
-    _In_ LPWSTR lpszProcessName,
-    _In_opt_ LPWSTR lpszParameters,
-    _In_opt_ LPWSTR lpVerb,
+    _In_ LPCWSTR lpFile,
+    _In_opt_ LPCWSTR lpParameters,
+    _In_opt_ LPCWSTR lpVerb,
     _In_ INT nShow,
     _In_ ULONG mTimeOut
 )
@@ -604,14 +629,11 @@ BOOL supRunProcess2(
     BOOL bResult;
     SHELLEXECUTEINFO shinfo;
 
-    if (lpszProcessName == NULL)
-        return FALSE;
-
     RtlSecureZeroMemory(&shinfo, sizeof(shinfo));
     shinfo.cbSize = sizeof(shinfo);
     shinfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-    shinfo.lpFile = lpszProcessName;
-    shinfo.lpParameters = lpszParameters;
+    shinfo.lpFile = lpFile;
+    shinfo.lpParameters = lpParameters;
     shinfo.nShow = nShow;
     shinfo.lpVerb = lpVerb;
     bResult = ShellExecuteEx(&shinfo);
@@ -634,12 +656,12 @@ BOOL supRunProcess2(
 *
 */
 BOOL supRunProcess(
-    _In_ LPWSTR lpszProcessName,
-    _In_opt_ LPWSTR lpszParameters
+    _In_ LPCWSTR lpFile,
+    _In_opt_ LPCWSTR lpParameters
 )
 {
-    return supRunProcess2(lpszProcessName,
-        lpszParameters,
+    return supRunProcess2(lpFile,
+        lpParameters,
         NULL,
         SW_SHOW,
         SUPRUNPROCESS_TIMEOUT_DEFAULT);
@@ -837,7 +859,7 @@ VOID ucmxBuildVersionString(
     RtlSecureZeroMemory(&szShortName, sizeof(szShortName));
     DecodeStringById(ISDB_PROGRAMNAME, (LPWSTR)&szShortName, sizeof(szShortName));
 
-    wsprintf(pszVersion, TEXT("%s v %lu.%lu.%lu.%lu"),
+    wsprintf(pszVersion, TEXT("%s v%lu.%lu.%lu.%lu"),
         szShortName,
         UCM_VERSION_MAJOR,
         UCM_VERSION_MINOR,
@@ -883,7 +905,7 @@ VOID ucmShowMessageById(
 */
 VOID ucmShowMessage(
     _In_ BOOL OutputToDebugger,
-    _In_ LPWSTR lpszMsg
+    _In_ LPCWSTR lpszMsg
 )
 {
     WCHAR szVersion[100];
@@ -1388,8 +1410,8 @@ BOOL supRegDeleteKeyRecursive(
 BOOL supSetEnvVariableEx(
     _In_ BOOL fRemove,
     _In_opt_ LPWSTR lpKeyName,
-    _In_ LPWSTR lpVariableName,
-    _In_opt_ LPWSTR lpVariableData
+    _In_ LPCWSTR lpVariableName,
+    _In_opt_ LPCWSTR lpVariableData
 )
 {
     BOOL        bNameAllocated = FALSE;
@@ -1455,20 +1477,19 @@ BOOL supSetEnvVariableEx(
                 (BYTE*)lpVariableData,
                 cbData);
 
-            if (NT_SUCCESS(ntStatus)) {
-
-                SendMessageTimeout(HWND_BROADCAST,
-                    WM_SETTINGCHANGE,
-                    0,
-                    (LPARAM)lpVariableName,
-                    SMTO_BLOCK,
-                    1000,
-                    NULL);
-
-            }
-
         }
 
+        if (NT_SUCCESS(ntStatus)) {
+
+            SendMessageTimeout(HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                (LPARAM)lpVariableName,
+                SMTO_BLOCK,
+                1000,
+                NULL);
+
+        }
 
     } while (FALSE);
 
@@ -1491,8 +1512,8 @@ BOOL supSetEnvVariableEx(
 BOOL supSetEnvVariable(
     _In_ BOOL fRemove,
     _In_opt_ LPWSTR lpKeyName,
-    _In_ LPWSTR lpVariableName,
-    _In_opt_ LPWSTR lpVariableData
+    _In_ LPCWSTR lpVariableName,
+    _In_opt_ LPCWSTR lpVariableData
 )
 {
     BOOL    bResult = FALSE;
@@ -1524,15 +1545,105 @@ BOOL supSetEnvVariable(
             bResult = (RegSetValueEx(hKey, lpVariableName, 0, REG_SZ,
                 (BYTE*)lpVariableData, cbData) == ERROR_SUCCESS);
 
-            if (bResult) {
-                SendMessageTimeout(HWND_BROADCAST,
-                    WM_SETTINGCHANGE,
-                    0,
-                    (LPARAM)lpVariableName,
-                    SMTO_BLOCK,
-                    1000,
-                    NULL);
+        }
+
+        if (bResult) {
+            SendMessageTimeout(HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                (LPARAM)lpVariableName,
+                SMTO_BLOCK,
+                1000,
+                NULL);
+        }
+
+    } while (FALSE);
+
+    if (hKey != NULL) {
+        RegFlushKey(hKey);
+        RegCloseKey(hKey);
+    }
+
+    return bResult;
+}
+
+/*
+* supSetEnvVariable
+*
+* Purpose:
+*
+* Remove or set current user environment variable.
+*
+*/
+BOOL supSetEnvVariable2(
+    _In_ BOOL fRemove,
+    _In_opt_ LPWSTR lpKeyName,
+    _In_ LPCWSTR lpVariableName,
+    _In_opt_ LPCWSTR lpVariableData
+)
+{
+    BOOL    bResult = FALSE;
+    HKEY    hKey = NULL;
+    DWORD   cbData;
+
+    LPWSTR lpSubKey;
+
+    LARGE_INTEGER liValue;
+    ULONG seedValue;
+    WCHAR szNewKey[MAX_PATH];
+
+    do {
+        if (lpVariableName == NULL)
+            break;
+
+        if (lpKeyName == NULL)
+            lpSubKey = L"Environment";
+        else
+            lpSubKey = lpKeyName;
+
+        if ((lpVariableData == NULL) && (fRemove == FALSE))
+            break;
+
+        RtlSecureZeroMemory(&szNewKey, sizeof(szNewKey));
+        seedValue = GetTickCount();
+        liValue.LowPart = RtlRandomEx(&seedValue);
+        seedValue = ~GetTickCount();
+        liValue.HighPart = RtlRandomEx(&seedValue);
+
+        supBinTextEncode(liValue.QuadPart, szNewKey);
+
+        if (ERROR_SUCCESS == RegRenameKey(HKEY_CURRENT_USER, lpSubKey, szNewKey)) {
+
+            if (ERROR_SUCCESS == RegOpenKey(HKEY_CURRENT_USER, szNewKey, &hKey)) {
+
+                if (fRemove) {
+                    bResult = (RegDeleteValue(hKey, lpVariableName) == ERROR_SUCCESS);
+                }
+                else {
+                    cbData = (DWORD)((1 + _strlen(lpVariableData)) * sizeof(WCHAR));
+                    bResult = (RegSetValueEx(hKey, lpVariableName, 0, REG_SZ,
+                        (BYTE*)lpVariableData, cbData) == ERROR_SUCCESS);
+
+
+                }
+
+                RegFlushKey(hKey);
+                RegCloseKey(hKey);
+                hKey = NULL;
+
             }
+
+            RegRenameKey(HKEY_CURRENT_USER, szNewKey, lpSubKey);
+        }
+
+        if (bResult) {
+            SendMessageTimeout(HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                (LPARAM)lpVariableName,
+                SMTO_BLOCK,
+                1000,
+                NULL);
         }
 
     } while (FALSE);
@@ -1596,8 +1707,8 @@ BOOL supDeleteMountPoint(
 */
 BOOL supSetMountPoint(
     _In_ HANDLE hDirectory,
-    _In_ LPWSTR lpTarget,
-    _In_ LPWSTR lpPrintName
+    _In_ LPCWSTR lpTarget,
+    _In_ LPCWSTR lpPrintName
 )
 {
     ULONG           memIO;
@@ -1681,7 +1792,7 @@ BOOL supSetMountPoint(
 *
 */
 HANDLE supOpenDirectoryForReparse(
-    _In_ LPWSTR lpDirectory
+    _In_ LPCWSTR lpDirectory
 )
 {
     NTSTATUS            status = STATUS_UNSUCCESSFUL;
@@ -1961,115 +2072,16 @@ PVOID supGetSystemInfo(
 *
 */
 BOOL supIsCorImageFile(
-    PVOID ImageBase
+    _In_ PVOID ImageBase
 )
 {
-    BOOL                bResult = FALSE;
     ULONG               sz = 0;
     IMAGE_COR20_HEADER* CliHeader;
 
-    if (ImageBase) {
-        CliHeader = (IMAGE_COR20_HEADER*)RtlImageDirectoryEntryToData(ImageBase, TRUE,
-            IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR, &sz);
+    CliHeader = (IMAGE_COR20_HEADER*)RtlImageDirectoryEntryToData(ImageBase, TRUE,
+        IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR, &sz);
 
-        if ((CliHeader == NULL) || (sz < sizeof(IMAGE_COR20_HEADER)))
-            return bResult;
-        bResult = TRUE;
-    }
-    return bResult;
-}
-
-/*
-* supIsConsentApprovedInterface
-*
-* Purpose:
-*
-* Test if the given interface is in consent COMAutoApprovalList.
-*
-*/
-BOOL supIsConsentApprovedInterface(
-    _In_ LPWSTR InterfaceName,
-    _Out_ PBOOL IsApproved
-)
-{
-    BOOL                bResult = FALSE;
-
-    UNICODE_STRING      usKey;
-    OBJECT_ATTRIBUTES   obja;
-    NTSTATUS            status = STATUS_UNSUCCESSFUL;
-    ULONG               dummy;
-
-    HANDLE              hKey = NULL;
-
-    ULONG               Index = 0;
-
-    BYTE* Buffer;
-    ULONG               Size = PAGE_SIZE;
-
-    PKEY_VALUE_BASIC_INFORMATION ValueInformation;
-
-    UNICODE_STRING      usKeyName, usInterfaceName;
-
-    WCHAR               szKeyName[256];
-
-    if (IsApproved)
-        *IsApproved = FALSE;
-    else
-        return FALSE;
-
-    RtlSecureZeroMemory(&szKeyName, sizeof(szKeyName));
-    DecodeStringById(ISDB_COMAUTOAPPROVALLIST, (LPWSTR)&szKeyName, sizeof(szKeyName));
-
-    RtlInitUnicodeString(&usKey, szKeyName);
-    InitializeObjectAttributes(&obja, &usKey, OBJ_CASE_INSENSITIVE, NULL, NULL);
-
-    bResult = NT_SUCCESS(NtOpenKey(
-        &hKey,
-        KEY_QUERY_VALUE,
-        &obja));
-
-    RtlSecureZeroMemory(&szKeyName, sizeof(szKeyName));
-
-    if (bResult) {
-
-        RtlInitUnicodeString(&usInterfaceName, InterfaceName);
-
-        Buffer = (BYTE*)supHeapAlloc(Size);
-        if (Buffer) {
-            ValueInformation = (PKEY_VALUE_BASIC_INFORMATION)Buffer;
-
-            do {
-
-                status = NtEnumerateValueKey(
-                    hKey,
-                    Index,
-                    KeyValueBasicInformation,
-                    ValueInformation,
-                    Size,
-                    &dummy);
-
-                if (NT_SUCCESS(status)) {
-
-                    usKeyName.MaximumLength = (USHORT)ValueInformation->NameLength;
-                    usKeyName.Buffer = ValueInformation->Name;
-                    usKeyName.Length = (USHORT)ValueInformation->NameLength;
-
-                    if (RtlEqualUnicodeString(&usInterfaceName, &usKeyName, TRUE)) {
-                        *IsApproved = TRUE;
-                        break;
-                    }
-                    Index++;
-                }
-
-            } while (status != STATUS_NO_MORE_ENTRIES);
-
-            supHeapFree(Buffer);
-        }
-
-        NtClose(hKey);
-    }
-
-    return bResult;
+    return ((CliHeader != NULL) && (sz >= sizeof(IMAGE_COR20_HEADER)));
 }
 
 /*
@@ -2483,6 +2495,11 @@ PVOID supCreateUacmeContext(
     // 3. Temp
     supExpandEnvironmentStrings(L"%temp%\\", Context->szTempDirectory, MAX_PATH);
 
+    // 4. Current directory
+    if (GetCurrentDirectory(MAX_PATH, Context->szCurrentDirectory) < MAX_PATH) {
+        supPathAddBackSlash(Context->szCurrentDirectory);
+    }
+
     //
     // Default payload path.
     //
@@ -2570,30 +2587,6 @@ NTSTATUS supEnableDisableWow64Redirection(
 }
 
 /*
-* supIsNetfx48PlusInstalled
-*
-* Purpose:
-*
-* Detect Netfx 4.8+
-*
-*/
-BOOLEAN supIsNetfx48PlusInstalled(
-    VOID)
-{
-    HKEY hKey = NULL;
-    DWORD Netfx48ReleaseVersion = 528040;
-    DWORD dwReleaseVersion = 0;
-    DWORD cbData = sizeof(DWORD), dwType = REG_DWORD;
-
-    if (ERROR_SUCCESS == RegOpenKeyEx(HKEY_LOCAL_MACHINE, T_DOTNET_FULL, 0, KEY_READ, &hKey)) {
-        RegQueryValueEx(hKey, TEXT("Release"), NULL, &dwType, (LPBYTE)&dwReleaseVersion, &cbData);
-        RegCloseKey(hKey);
-    }
-
-    return (dwReleaseVersion >= Netfx48ReleaseVersion);
-}
-
-/*
 * supGetProcessDebugObject
 *
 * Purpose:
@@ -2611,159 +2604,6 @@ NTSTATUS supGetProcessDebugObject(
         DebugObjectHandle,
         sizeof(HANDLE),
         NULL);
-}
-
-/*
-* supInitFusion
-*
-* Purpose:
-*
-* Load .NET Assembly Manager dll and remember function pointers.
-*
-*/
-BOOLEAN supInitFusion(
-    _In_ DWORD dwVersion
-)
-{
-    HMODULE hFusion;
-    pfnCreateAssemblyCache CreateAssemblyCache;
-
-    WCHAR szBuffer[MAX_PATH * 2];
-
-    if (g_ctx->FusionContext.Initialized)
-        return TRUE;
-
-    if (dwVersion != 2 && dwVersion != 4)
-        return FALSE;
-
-    //
-    // Build path to assembly manager dll
-    //
-    _strcpy(szBuffer, g_ctx->szSystemRoot);
-    _strcat(szBuffer, MSNETFRAMEWORK_DIR);
-
-#ifdef _WIN64
-    _strcat(szBuffer, TEXT("64"));
-#endif
-
-    if (dwVersion == 2) {
-        _strcat(szBuffer, TEXT("\\"));
-        _strcat(szBuffer, NET2_DIR);
-        _strcat(szBuffer, TEXT("\\"));
-    }
-    else
-    {
-        _strcat(szBuffer, TEXT("\\"));
-        _strcat(szBuffer, NET4_DIR);
-        _strcat(szBuffer, TEXT("\\"));
-    }
-
-    _strcat(szBuffer, TEXT("fusion.dll"));
-
-    hFusion = LoadLibraryEx(szBuffer, NULL, 0);
-    if (hFusion == NULL)
-        return FALSE;
-
-    CreateAssemblyCache = (pfnCreateAssemblyCache)GetProcAddress(hFusion, "CreateAssemblyCache");
-
-    if (CreateAssemblyCache == NULL) {
-        FreeLibrary(hFusion);
-        return FALSE;
-    }
-
-    g_ctx->FusionContext.hFusion = hFusion;
-    g_ctx->FusionContext.CreateAssemblyCache = CreateAssemblyCache;
-    g_ctx->FusionContext.Initialized = TRUE;
-
-    return TRUE;
-}
-
-/*
-* supFusionGetAssemblyPath
-*
-* Purpose:
-*
-* Return given assembly file path.
-*
-* Note: Use supHeapFree to release lpAssemblyPath allocated memory.
-*
-*/
-HRESULT supFusionGetAssemblyPath(
-    _In_ IAssemblyCache* pInterface,
-    _In_ LPWSTR lpAssemblyName,
-    _Inout_ LPWSTR* lpAssemblyPath
-)
-{
-    HRESULT hr = E_FAIL;
-    ASSEMBLY_INFO asmInfo;
-    LPWSTR assemblyPath;
-
-    *lpAssemblyPath = NULL;
-
-    RtlSecureZeroMemory(&asmInfo, sizeof(asmInfo));
-
-    pInterface->lpVtbl->QueryAssemblyInfo(pInterface,
-        QUERYASMINFO_FLAG_GETSIZE,
-        lpAssemblyName,
-        &asmInfo);
-
-    if (asmInfo.cchBuf == 0) //empty pszCurrentAssemblyPathBuf
-        return E_FAIL;
-
-    assemblyPath = (LPWSTR)supHeapAlloc(asmInfo.cchBuf * sizeof(WCHAR));
-    if (assemblyPath == NULL)
-        return E_FAIL;
-
-    asmInfo.pszCurrentAssemblyPathBuf = assemblyPath;
-
-    hr = pInterface->lpVtbl->QueryAssemblyInfo(pInterface,
-        QUERYASMINFO_FLAG_VALIDATE,
-        lpAssemblyName,
-        &asmInfo);
-
-    if (!SUCCEEDED(hr)) {
-        supHeapFree(asmInfo.pszCurrentAssemblyPathBuf);
-    }
-    else {
-        *lpAssemblyPath = assemblyPath;
-    }
-
-    return hr;
-}
-
-/*
-* supFusionGetAssemblyPathByName
-*
-* Purpose:
-*
-* Return given assembly file path.
-*
-* Note: Use supHeapFree to release lpAssemblyPath allocated memory.
-*
-*/
-BOOLEAN supFusionGetAssemblyPathByName(
-    _In_ LPWSTR lpAssemblyName,
-    _Inout_ LPWSTR* lpAssemblyPath
-)
-{
-    HRESULT hr;
-    IAssemblyCache* asmCache = NULL;
-
-    do {
-
-        hr = g_ctx->FusionContext.CreateAssemblyCache(&asmCache, 0);
-        if ((FAILED(hr)) || (asmCache == NULL))
-            break;
-
-        hr = supFusionGetAssemblyPath(asmCache,
-            lpAssemblyName,
-            lpAssemblyPath);
-
-        asmCache->lpVtbl->Release(asmCache);
-
-    } while (FALSE);
-
-    return SUCCEEDED(hr);
 }
 
 /*
@@ -2820,263 +2660,6 @@ BOOL supIsProcessRunning(
     supHeapFree(processList);
 
     return bResult;
-}
-
-/*
-* supFusionGetImageMVID
-*
-* Purpose:
-*
-* Query MVID value from image metadata.
-*
-*/
-BOOL supFusionGetImageMVID(
-    _In_ LPWSTR lpImageName,
-    _Out_ GUID* ModuleVersionId
-)
-{
-    BOOL bResult = FALSE;
-    HMODULE hModule;
-    PVOID baseAddress;
-    IMAGE_COR20_HEADER* cliHeader;
-    ULONG sz, offset;
-
-    PBYTE streamData, streamPtr;
-
-    STORAGESIGNATURE* pStorSign;
-    STORAGEHEADER* pStorHeader;
-    STORAGESTREAM* pStorStream;
-
-    SIZE_T nameLen;
-    WORD i = 0;
-    RPC_STATUS st;
-
-    st = UuidCreateNil(ModuleVersionId);
-    if (st != S_OK)
-        return FALSE;
-
-    hModule = LoadLibraryEx(lpImageName, NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
-    if (hModule) {
-
-        baseAddress = (PBYTE)(((ULONG_PTR)hModule) & ~3);
-
-        cliHeader = (IMAGE_COR20_HEADER*)RtlImageDirectoryEntryToData(baseAddress, TRUE,
-            IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR, &sz);
-
-        pStorSign = (STORAGESIGNATURE*)RtlOffsetToPointer(baseAddress, cliHeader->MetaData.VirtualAddress);
-        if (pStorSign->lSignature == 'BJSB') {
-
-            offset = FIELD_OFFSET(STORAGESIGNATURE, pVersion) + pStorSign->iVersionString;
-            pStorHeader = (STORAGEHEADER*)RtlOffsetToPointer(pStorSign, offset);
-
-            streamPtr = (PBYTE)RtlOffsetToPointer(pStorHeader, sizeof(STORAGEHEADER));
-
-            do {
-                pStorStream = (STORAGESTREAM*)streamPtr;
-                if (_strcmpi_a(pStorStream->rcName, "#GUID") == 0) {
-                    if (pStorStream->iSize == sizeof(GUID)) {
-                        streamData = (PBYTE)RtlOffsetToPointer(pStorSign, pStorStream->iOffset);
-                        RtlCopyMemory(ModuleVersionId, streamData, sizeof(GUID));
-                        bResult = TRUE;
-                    }
-                    break;
-                }
-
-                nameLen = _strlen_a(pStorStream->rcName) + 1;
-                offset = ALIGN_UP(FIELD_OFFSET(STORAGESTREAM, rcName) + nameLen, ULONG);
-                streamPtr = (PBYTE)RtlOffsetToPointer(streamPtr, offset);
-                i++;
-
-            } while (i < pStorHeader->iStreams);
-        }
-
-        FreeLibrary(hModule);
-    }
-
-    return bResult;
-}
-
-/*
-* supxFusionScanFiles
-*
-* Purpose:
-*
-* Scan directory for files of given type.
-*
-* Note:
-* Return TRUE to abort further scan, FALSE otherwise.
-*
-*/
-BOOL supxFusionScanFiles(
-    _In_ LPWSTR lpDirectory,
-    _In_ LPWSTR lpExtension,
-    _In_ pfnFusionScanFilesCallback pfnCallback,
-    _In_opt_ PVOID pvUserContext
-)
-{
-    BOOL bResult = FALSE;
-    HANDLE hFile;
-    LPWSTR lpLookupDirectory = NULL;
-    SIZE_T sz, dirLen;
-    WIN32_FIND_DATA fdata;
-
-    dirLen = _strlen(lpDirectory);
-
-    sz = (1 + dirLen + _strlen(lpExtension)) * sizeof(WCHAR);
-    lpLookupDirectory = (LPWSTR)supHeapAlloc(sz);
-    if (lpLookupDirectory) {
-
-        _strcpy(lpLookupDirectory, lpDirectory);
-
-        if (lpLookupDirectory[dirLen - 1] != L'\\') {
-            lpLookupDirectory[dirLen] = L'\\';
-            lpLookupDirectory[dirLen + 1] = 0;
-        }
-
-        _strcat(lpLookupDirectory, lpExtension);
-
-        RtlSecureZeroMemory(&fdata, sizeof(fdata));
-        hFile = FindFirstFile(lpLookupDirectory, &fdata);
-        if (hFile != INVALID_HANDLE_VALUE) {
-            do {
-
-                if (pfnCallback(lpDirectory, &fdata, pvUserContext)) {
-                    bResult = TRUE;
-                    break;
-                }
-
-            } while (FindNextFile(hFile, &fdata));
-            FindClose(hFile);
-        }
-        supHeapFree(lpLookupDirectory);
-    }
-
-    return bResult;
-}
-
-/*
-* supFusionScanDirectory
-*
-* Purpose:
-*
-* Recursively scan directories looking for files with given extension.
-*
-*/
-BOOL supFusionScanDirectory(
-    _In_ LPWSTR lpDirectory,
-    _In_ LPWSTR lpExtension,
-    _In_ pfnFusionScanFilesCallback pfnCallback,
-    _In_opt_ PVOID pvUserContext
-)
-{
-    BOOL                bResult = FALSE;
-    SIZE_T              dirLen;
-    HANDLE              hDirectory;
-    LPWSTR              lpFilePath;
-    WIN32_FIND_DATA     fdata;
-
-    if (lpDirectory == NULL || lpExtension == NULL)
-        return FALSE;
-    if (_strlen(lpExtension) > 16)
-        return FALSE;
-
-    if (supxFusionScanFiles(lpDirectory, lpExtension, pfnCallback, pvUserContext))
-        return TRUE;
-
-    dirLen = _strlen(lpDirectory);
-    lpFilePath = (LPWSTR)supHeapAlloc((2 * MAX_PATH + dirLen) * sizeof(WCHAR));
-    if (lpFilePath == NULL)
-        return FALSE;
-
-    _strcpy(lpFilePath, lpDirectory);
-
-    if (lpFilePath[dirLen - 1] != L'\\') {
-        lpFilePath[dirLen] = L'\\';
-        lpFilePath[dirLen + 1] = 0;
-        dirLen++;
-    }
-
-    lpFilePath[dirLen] = L'*';
-    lpFilePath[dirLen + 1] = 0;
-
-    RtlSecureZeroMemory(&fdata, sizeof(fdata));
-    hDirectory = FindFirstFile(lpFilePath, &fdata);
-    if (hDirectory != INVALID_HANDLE_VALUE) {
-        do {
-            if ((fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-                (fdata.cFileName[0] != L'.')
-                )
-            {
-                _strcpy(lpFilePath, lpDirectory);
-                _strcat(lpFilePath, fdata.cFileName);
-
-                bResult = supFusionScanDirectory(lpFilePath,
-                    lpExtension,
-                    pfnCallback,
-                    pvUserContext);
-
-                if (bResult)
-                    break;
-
-            }
-        } while (FindNextFile(hDirectory, &fdata));
-        FindClose(hDirectory);
-    }
-
-    supHeapFree(lpFilePath);
-
-    return bResult;
-}
-
-/*
-* supFusionFindFileByMVIDCallback
-*
-* Purpose:
-*
-* supFusionScanDirectory callback for MVID comparison.
-*
-*/
-BOOL supFusionFindFileByMVIDCallback(
-    _In_ LPWSTR CurrentDirectory,
-    _In_ WIN32_FIND_DATA* FindData,
-    _In_ PVOID UserContext
-)
-{
-    FUSION_SCAN_PARAM* ScanParam = (FUSION_SCAN_PARAM*)UserContext;
-    LPWSTR lpFileName;
-    SIZE_T nLen, dirLen;
-    GUID mVid;
-    RPC_STATUS rpcStatus;
-
-    dirLen = _strlen(CurrentDirectory);
-    nLen = 2 + MAX_PATH + dirLen;
-    lpFileName = (LPWSTR)supHeapAlloc(nLen * sizeof(WCHAR));
-    if (lpFileName) {
-
-        _strcpy(lpFileName, CurrentDirectory);
-
-        if (lpFileName[dirLen - 1] != L'\\') {
-            lpFileName[dirLen] = L'\\';
-            lpFileName[dirLen + 1] = 0;
-            dirLen++;
-        }
-
-        _strcat(lpFileName, FindData->cFileName);
-
-        if (supFusionGetImageMVID(lpFileName, &mVid)) {
-
-            if (0 == UuidCompare(ScanParam->ReferenceMVID,
-                &mVid,
-                &rpcStatus))
-            {
-                ScanParam->lpFileName = lpFileName;
-                return TRUE;
-            }
-        }
-
-        supHeapFree(lpFileName);
-    }
-    return FALSE;
 }
 
 /*
@@ -3632,9 +3215,9 @@ NTSTATUS supRegisterShellAssoc(
     _In_ LPCWSTR pszExt,
     _In_ LPCWSTR pszProgId,
     _In_ USER_ASSOC_PTR* UserAssocFunc,
-    _In_ LPWSTR lpszPayload,
+    _In_ LPCWSTR lpszPayload,
     _In_ BOOL fCustomURIScheme,
-    _In_opt_ LPWSTR pszDefaultValue
+    _In_opt_ LPCWSTR pszDefaultValue
 )
 {
     HANDLE classesKey = NULL, protoKey = NULL, assocKey = NULL;
@@ -3875,191 +3458,601 @@ NTSTATUS supResetShellAssoc(
         pszExt,
         pszProgId,
         UserAssocFunc);
-    
+
 }
 
 /*
-* supGetAppxIdValue
+* supStopTaskByName
 *
 * Purpose:
 *
-* Read AppX package value name from registry.
+* Stop scheduled task by name.
 *
 */
-BOOL supGetAppxIdValue(
-    _In_ LPWSTR lpKey,
-    _In_ LPWSTR lpPackageName,
-    _Inout_ LPWSTR* lpAppxId,
-    _Inout_ PDWORD pcbAppxId
+BOOL supStopTaskByName(
+    _In_ LPCWSTR TaskFolder,
+    _In_ LPCWSTR TaskName
 )
 {
     BOOL bResult = FALSE;
-    HKEY hKey, hUrlSubKey;
-    DWORD dwType = REG_SZ;
+    HRESULT hr;
+    ITaskService* pService = NULL;
+    ITaskFolder* pRootFolder = NULL;
+    IRegisteredTask* pTask = NULL;
+    TASK_STATE taskState;
 
-    LPWSTR lpData;
-    DWORD cbData;
-
-    if (ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER,
-        lpKey,
-        0,
-        KEY_READ,
-        &hKey))
-    {
-
-        if (ERROR_SUCCESS == RegOpenKeyEx(hKey,
-            TEXT("URLAssociations"),
-            0,
-            KEY_READ,
-            &hUrlSubKey))
-        {
-            cbData = 0;
-            dwType = 0;
-
-            if (ERROR_SUCCESS == RegQueryValueEx(hUrlSubKey,
-                lpPackageName,
-                NULL,
-                &dwType,
-                NULL,
-                &cbData))
-            {
-                if (dwType == REG_SZ) {
-                    lpData = (LPWSTR)supHeapAlloc(cbData);
-                    if (lpData) {
-                        if (ERROR_SUCCESS == RegQueryValueEx(hUrlSubKey,
-                            lpPackageName,
-                            NULL,
-                            &dwType,
-                            (LPBYTE)lpData,
-                            &cbData))
-                        {
-                            *pcbAppxId = cbData;
-                            *lpAppxId = lpData;
-                            bResult = TRUE;
-                        }
-                        else {
-                            supHeapFree(lpData);
-                        }
-                    }
-
-                }
-            }
-
-            RegCloseKey(hUrlSubKey);
-        }
-
-        RegCloseKey(hKey);
-    }
-
-    return bResult;
-}
-
-/*
-* supGetAppxId
-*
-* Purpose:
-*
-* Query component appx name from registry.
-* Use supHeapFree to release allocated memory.
-*
-*/
-BOOL supGetAppxId(
-    _In_ LPWSTR lpComponentName,
-    _In_ LPWSTR lpPackageName,
-    _Out_ LPWSTR* lpAppxId,
-    _Out_ PDWORD pcbAppxId
-)
-{
-    BOOL bResult = FALSE;
-    HKEY hKey;
-
-    DWORD i, dwValuesCount = 0, dwMaxValueNameLen = 0, dwMaxValueLen = 0, cchValue, dwType, dwDataLen;
-
-    LPWSTR lpValueData = NULL;
-
-    *lpAppxId = NULL;
-    *pcbAppxId = 0;
-
-    WCHAR szValue[MAX_PATH + 1];
-
-    if (ERROR_SUCCESS != RegOpenKeyEx(HKEY_CURRENT_USER,
-        TEXT("SOFTWARE\\RegisteredApplications"),
-        0,
-        KEY_READ,
-        &hKey))
-    {
-        return FALSE;
-    }
+    BSTR bstrTaskFolder = NULL;
+    BSTR bstrTask = NULL;
+    VARIANT varDummy;
 
     do {
 
-        if (ERROR_SUCCESS != RegQueryInfoKey(hKey,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            &dwValuesCount,
-            &dwMaxValueNameLen,
-            &dwMaxValueLen,
-            NULL,
-            NULL))
-        {
+        bstrTaskFolder = SysAllocString(TaskFolder);
+        if (bstrTaskFolder == NULL)
             break;
+
+        bstrTask = SysAllocString(TaskName);
+        if (bstrTask == NULL)
+            break;
+
+        hr = CoCreateInstance(&CLSID_TaskScheduler,
+            NULL,
+            CLSCTX_INPROC_SERVER,
+            &IID_ITaskService,
+            (void**)&pService);
+
+        if (FAILED(hr))
+            break;
+
+        VariantInit(&varDummy);
+
+        hr = pService->lpVtbl->Connect(pService,
+            varDummy,
+            varDummy,
+            varDummy,
+            varDummy);
+
+        if (FAILED(hr))
+            break;
+
+        hr = pService->lpVtbl->GetFolder(pService, bstrTaskFolder, &pRootFolder);
+        if (FAILED(hr))
+            break;
+
+        hr = pRootFolder->lpVtbl->GetTask(pRootFolder, bstrTask, &pTask);
+        if (FAILED(hr))
+            break;
+
+        hr = pTask->lpVtbl->get_State(pTask, &taskState);
+        if (FAILED(hr))
+            break;
+
+        if (taskState == TASK_STATE_RUNNING) {
+            hr = pTask->lpVtbl->Stop(pTask, 0);
         }
 
-        if (dwValuesCount == 0)
-            break;
-
-        lpValueData = (LPWSTR)supHeapAlloc(dwMaxValueLen);
-        if (lpValueData == NULL)
-            break;
-
-        RtlSecureZeroMemory(&szValue, sizeof(szValue));
-
-        for (i = 0; i < dwValuesCount; i++) {
-
-            dwType = 0;
-            dwDataLen = dwMaxValueLen;
-
-            cchValue = MAX_PATH;
-            szValue[0] = 0;
-
-            if (ERROR_SUCCESS == RegEnumValue(hKey,
-                i,
-                (LPWSTR)&szValue,
-                (LPDWORD)&cchValue,
-                NULL,
-                &dwType,
-                (LPBYTE)lpValueData,
-                &dwDataLen))
-            {
-                if (dwType == REG_SZ) {
-
-                    lpValueData[dwDataLen] = 0;
-
-                    if (NULL != _strstri(lpValueData, lpComponentName)) {
-
-                        bResult = supGetAppxIdValue(lpValueData,
-                            lpPackageName,
-                            lpAppxId,
-                            pcbAppxId);
-
-                        if (bResult)
-                            break;
-
-                    }
-                }
-            }
-
-        }
+        bResult = SUCCEEDED(hr);
 
     } while (FALSE);
 
-    if (lpValueData) supHeapFree(lpValueData);
+    if (bstrTaskFolder)
+        SysFreeString(bstrTaskFolder);
 
-    RegCloseKey(hKey);
+    if (bstrTask)
+        SysFreeString(bstrTask);
+
+    if (pTask)
+        pTask->lpVtbl->Release(pTask);
+
+    if (pRootFolder)
+        pRootFolder->lpVtbl->Release(pRootFolder);
+
+    if (pService)
+        pService->lpVtbl->Release(pService);
 
     return bResult;
+}
+
+/*
+* supPathAddBackSlash
+*
+* Purpose:
+*
+* Add trailing backslash to the path if it doesn't have one.
+*
+*/
+LPWSTR supPathAddBackSlash(
+    _In_ LPWSTR lpszPath
+)
+{
+    SIZE_T nLength;
+    LPWSTR lpszEnd, lpszPrev, lpszResult = NULL;
+
+    nLength = _strlen(lpszPath);
+
+    if (nLength) {
+
+        lpszEnd = lpszPath + nLength;
+
+        if (lpszPath == lpszEnd)
+            lpszPrev = lpszPath;
+        else
+            lpszPrev = (LPWSTR)lpszEnd - 1;
+
+        if (*lpszPrev != TEXT('\\')) {
+            *lpszEnd++ = TEXT('\\');
+            *lpszEnd = TEXT('\0');
+        }
+
+        lpszResult = lpszEnd;
+
+    }
+
+    return lpszResult;
+}
+
+/*
+* supOpenShellProcess
+*
+* Purpose:
+*
+* Return handle to shell process.
+*
+*/
+HANDLE supOpenShellProcess(
+    _In_ ULONG dwDesiredAccess
+)
+{
+    HWND hwndShell = GetShellWindow();
+    ULONG processId = 0, desiredAccess = dwDesiredAccess;
+
+    GetWindowThreadProcessId(hwndShell, &processId);
+    if (processId) {
+
+        if (!(desiredAccess & PROCESS_CREATE_PROCESS))
+            desiredAccess |= PROCESS_CREATE_PROCESS;
+
+        return OpenProcess(desiredAccess, FALSE, processId);
+
+    }
+
+    return NULL;
+}
+
+/*
+* supRunProcessFromParent
+*
+* Purpose:
+*
+* Start new process with given parent.
+*
+*/
+HANDLE supRunProcessFromParent(
+    _In_ HANDLE hParentProcess,
+    _Inout_opt_ LPWSTR lpApplicationName,
+    _In_ LPWSTR lpszParameters,
+    _In_opt_ LPWSTR lpCurrentDirectory,
+    _In_ ULONG CreationFlags,
+    _In_ WORD ShowWindowFlags,
+    _Out_opt_ HANDLE* PrimaryThread
+)
+{
+    BOOL bResult = FALSE;
+    DWORD dwFlags = CreationFlags | CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS;
+
+    HANDLE hNewProcess = NULL;
+
+    LPWSTR pszBuffer = NULL;
+    SIZE_T size;
+    STARTUPINFOEX si;
+    PROCESS_INFORMATION pi;
+
+    if (PrimaryThread)
+        *PrimaryThread = NULL;
+
+    RtlSecureZeroMemory(&pi, sizeof(pi));
+    RtlSecureZeroMemory(&si, sizeof(si));
+
+    size = (1 + _strlen(lpszParameters)) * sizeof(WCHAR);
+    pszBuffer = (LPWSTR)supHeapAlloc(size);
+    if (pszBuffer) {
+
+        _strcpy(pszBuffer, lpszParameters);
+        si.StartupInfo.cb = sizeof(STARTUPINFOEX);
+
+        size = 0x30;
+
+        do {
+            if (size > 1024)
+                break;
+
+            si.lpAttributeList = supHeapAlloc(size);
+            if (si.lpAttributeList) {
+
+                if (InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &size)) {
+                    if (UpdateProcThreadAttribute(si.lpAttributeList, 0,
+                        PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &hParentProcess, sizeof(hParentProcess), 0, 0))
+                    {
+                        si.StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
+                        si.StartupInfo.wShowWindow = ShowWindowFlags;
+
+                        bResult = CreateProcess(lpApplicationName,
+                            pszBuffer,
+                            NULL,
+                            NULL,
+                            FALSE,
+                            dwFlags | EXTENDED_STARTUPINFO_PRESENT,
+                            NULL,
+                            lpCurrentDirectory,
+                            (LPSTARTUPINFO)&si,
+                            &pi);
+
+                        if (bResult) {
+                            hNewProcess = pi.hProcess;
+                            if (PrimaryThread) {
+                                *PrimaryThread = pi.hThread;
+                            }
+                            else {
+                                CloseHandle(pi.hThread);
+                            }
+                        }
+
+                    }
+
+                    if (si.lpAttributeList)
+                        DeleteProcThreadAttributeList(si.lpAttributeList); //dumb empty routine
+
+                }
+                supHeapFree(si.lpAttributeList);
+            }
+
+        } while (GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+
+        supHeapFree(pszBuffer);
+    }
+
+    return hNewProcess;
+}
+
+/*
+* supCreateBindingHandle
+*
+* Purpose:
+*
+* Bind handle to the RPC interface.
+*
+*/
+RPC_STATUS supCreateBindingHandle(
+    _In_ RPC_WSTR RpcInterfaceUuid,
+    _Out_ RPC_BINDING_HANDLE* BindingHandle
+)
+{
+    RPC_STATUS status = RPC_S_INTERNAL_ERROR;
+    RPC_SECURITY_QOS_V3 sqos;
+    RPC_WSTR StringBinding = NULL;
+    RPC_BINDING_HANDLE Binding = NULL;
+    PSID LocalSystemSid = NULL;
+    DWORD cbSid = SECURITY_MAX_SID_SIZE;
+
+
+    if (BindingHandle)
+        *BindingHandle = NULL;
+
+    RtlSecureZeroMemory(&sqos, sizeof(sqos));
+
+    status = RpcStringBindingComposeW(RpcInterfaceUuid,
+        TEXT("ncalrpc"),
+        NULL,
+        NULL,
+        NULL,
+        &StringBinding);
+
+    if (status == RPC_S_OK) {
+
+        status = RpcBindingFromStringBindingW(StringBinding, &Binding);
+        RpcStringFreeW(&StringBinding);
+
+        if (status == RPC_S_OK) {
+
+            LocalSystemSid = LocalAlloc(LPTR, cbSid);
+            if (LocalSystemSid) {
+                if (CreateWellKnownSid(WinLocalSystemSid, NULL, LocalSystemSid, &cbSid)) {
+
+                    sqos.Version = 3;
+                    sqos.ImpersonationType = RPC_C_IMP_LEVEL_IMPERSONATE;
+                    sqos.Capabilities = RPC_C_QOS_CAPABILITIES_MUTUAL_AUTH;
+                    sqos.IdentityTracking = 0;
+                    sqos.Sid = LocalSystemSid;
+
+                    status = RpcBindingSetAuthInfoExW(Binding,
+                        NULL,
+                        RPC_C_AUTHN_LEVEL_PKT_PRIVACY,
+                        RPC_C_AUTHN_WINNT,
+                        0,
+                        0,
+                        (RPC_SECURITY_QOS*)&sqos);
+
+                    if (status == RPC_S_OK) {
+                        *BindingHandle = Binding;
+                        Binding = NULL;
+                    }
+
+                }
+                else {
+                    status = GetLastError();
+                }
+                LocalFree(LocalSystemSid);
+            }
+            else {
+                status = ERROR_NOT_ENOUGH_MEMORY;
+            }
+        }
+    }
+
+    if (Binding)
+        RpcBindingFree(&Binding);
+
+    return status;
+}
+
+/*
+* supConcatenatePaths
+*
+* Purpose:
+*
+* Concatenate 2 paths.
+*
+*/
+BOOL supConcatenatePaths(
+    _Inout_ LPWSTR Target,
+    _In_ LPCWSTR Path,
+    _In_ SIZE_T TargetBufferSize
+)
+{
+    SIZE_T TargetLength, PathLength;
+    BOOL TrailingBackslash, LeadingBackslash;
+    SIZE_T EndingLength;
+
+    TargetLength = _strlen(Target);
+    PathLength = _strlen(Path);
+
+    if (TargetLength && (*CharPrev(Target, Target + TargetLength) == TEXT('\\'))) {
+        TrailingBackslash = TRUE;
+        TargetLength--;
+    }
+    else {
+        TrailingBackslash = FALSE;
+    }
+
+    if (Path[0] == TEXT('\\')) {
+        LeadingBackslash = TRUE;
+        PathLength--;
+    }
+    else {
+        LeadingBackslash = FALSE;
+    }
+
+    EndingLength = TargetLength + PathLength + 2;
+
+    if (!LeadingBackslash && (TargetLength < TargetBufferSize)) {
+        Target[TargetLength++] = TEXT('\\');
+    }
+
+    if (TargetBufferSize > TargetLength) {
+        _strncpy(Target + TargetLength,
+            TargetBufferSize - TargetLength,
+            Path,
+            TargetBufferSize - TargetLength);
+    }
+
+    if (TargetBufferSize) {
+        Target[TargetBufferSize - 1] = 0;
+    }
+
+    return (EndingLength <= TargetBufferSize);
+}
+
+/*
+* supRemoveDirectoryRecursive
+*
+* Purpose:
+*
+* Recursively deletes the specified directory and all the files in it.
+*
+*/
+BOOL supRemoveDirectoryRecursive(
+    _In_ LPCWSTR Path
+)
+{
+    BOOL            bFind = TRUE;
+    BOOL            Ret = TRUE;
+    DWORD           dwAttributes;
+    HANDLE          hFind;
+    WCHAR           szTemp[MAX_PATH + 1];
+    WCHAR           FindPath[MAX_PATH + 1];
+    WIN32_FIND_DATA FindFileData;
+
+    _strncpy(FindPath, MAX_PATH, Path, MAX_PATH);
+    dwAttributes = GetFileAttributes(Path);
+
+    if (dwAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        supConcatenatePaths(FindPath, TEXT("*.*"), MAX_PATH);
+    }
+
+    hFind = FindFirstFile(FindPath, &FindFileData);
+
+    while (hFind != INVALID_HANDLE_VALUE && bFind != FALSE) {
+
+        _strncpy(szTemp, MAX_PATH, Path, MAX_PATH);
+        supConcatenatePaths(szTemp, FindFileData.cFileName, MAX_PATH);
+
+        //
+        // This is a directory, reenter.
+        //
+        if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+            (FindFileData.cFileName[0] != TEXT('.'))) {
+
+            if (!supRemoveDirectoryRecursive(szTemp)) {
+
+                Ret = FALSE;
+            }
+
+            RemoveDirectory(szTemp);
+        }
+
+        //
+        // Remove file.
+        //
+        else if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+
+            DeleteFile(szTemp);
+        }
+
+        bFind = FindNextFile(hFind, &FindFileData);
+    }
+
+    FindClose(hFind);
+
+    //
+    // Remove the root directory.
+    //
+    dwAttributes = GetFileAttributes(Path);
+    if (dwAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+
+        if (!RemoveDirectory(Path)) {
+
+            Ret = FALSE;
+        }
+    }
+
+    return Ret;
+}
+
+/*
+* supEnumProcessesForSession
+*
+* Purpose:
+*
+* Enumerate running processes in given session and run callback.
+*
+*/
+BOOL supEnumProcessesForSession(
+    _In_ ULONG SessionId,
+    _In_ pfnEnumProcessCallback Callback,
+    _In_opt_ PVOID UserContext
+)
+{
+    BOOL bStopEnumeration = FALSE;
+    ULONG nextEntryDelta = 0;
+    PVOID processList;
+
+    union {
+        PSYSTEM_PROCESSES_INFORMATION Processes;
+        PBYTE ListRef;
+    } List;
+
+    processList = supGetSystemInfo(SystemProcessInformation);
+    if (processList) {
+
+        List.ListRef = (PBYTE)processList;
+
+        do {
+
+            List.ListRef += nextEntryDelta;
+
+            if (List.Processes->SessionId == SessionId) {
+
+                bStopEnumeration = Callback(List.Processes, UserContext);
+                if (bStopEnumeration)
+                    break;
+
+            }
+
+            nextEntryDelta = List.Processes->NextEntryDelta;
+
+        } while (nextEntryDelta);
+
+        supHeapFree(processList);
+
+    }
+
+    return bStopEnumeration;
+}
+
+/*
+* supEnableToastForProtocol
+*
+* Purpose:
+*
+* Enumerate registered prog id's for the given interface and enable/disable toast for them.
+*
+*/
+VOID supEnableToastForProtocol(
+    _In_ LPCWSTR lpProtocol,
+    _In_ BOOL fEnable
+)
+{
+    HRESULT hr;
+    DWORD celtFetched, dwValue;
+    SIZE_T cbName;
+    LPWSTR lpProgId, lpValue;
+    IAssocHandler* assocHandler;
+    IEnumAssocHandlers* enumHandlers = NULL;
+    IObjectWithProgID* progId = NULL;
+
+    if (FAILED(SHAssocEnumHandlersForProtocolByApplication(lpProtocol,
+        &IID_IEnumAssocHandlers, (PVOID*)&enumHandlers)))
+    {
+        return;
+    }
+
+    do {
+        celtFetched = 0;
+        assocHandler = NULL;
+        hr = enumHandlers->lpVtbl->Next(enumHandlers, 1, &assocHandler, &celtFetched);
+        if (SUCCEEDED(hr) && celtFetched) {
+
+            hr = assocHandler->lpVtbl->QueryInterface(assocHandler,
+                &IID_IObjectWithProgID, (PVOID*)&progId);
+
+            if (SUCCEEDED(hr)) {
+
+                lpProgId = NULL;
+                hr = progId->lpVtbl->GetProgID(progId, &lpProgId);
+                if (SUCCEEDED(hr) && lpProgId) {
+
+                    cbName = (4 + _strlen(lpProtocol) +
+                        _strlen(lpProgId)) * sizeof(WCHAR);
+                    lpValue = (LPWSTR)supHeapAlloc(cbName);
+                    if (lpValue) {
+
+                        _strcpy(lpValue, lpProgId);
+                        _strcat(lpValue, TEXT("_"));
+                        _strcat(lpValue, lpProtocol);
+
+                        dwValue = fEnable;
+
+                        RegSetKeyValue(HKEY_CURRENT_USER,
+                            T_APP_ASSOC_TOASTS,
+                            lpValue,
+                            REG_DWORD,
+                            (LPCVOID)&dwValue,
+                            sizeof(DWORD));
+
+
+                        supHeapFree(lpValue);
+                    }
+                    CoTaskMemFree(lpProgId);
+                }
+
+                progId->lpVtbl->Release(progId);
+            }
+
+            assocHandler->lpVtbl->Release(assocHandler);
+        }
+
+    } while (celtFetched);
+
+    enumHandlers->lpVtbl->Release(enumHandlers);
+
 }

@@ -4,9 +4,9 @@
 *
 *  TITLE:       CONSTS.H
 *
-*  VERSION:     3.55
+*  VERSION:     3.58
 *
-*  DATE:        11 Mar 2021
+*  DATE:        01 Dec 2021
 *
 *  Global consts definition file.
 *
@@ -42,17 +42,13 @@
 //"This method fixed/unavailable in the current version of Windows, do you still want to continue?"
 #define ISDB_USAGE_UACFIX               5
 
-//"\\REGISTRY\\MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\UAC\\COMAutoApprovalList"
-#define ISDB_COMAUTOAPPROVALLIST        6
-
 //"UACMe"
-#define ISDB_PROGRAMNAME                7
+#define ISDB_PROGRAMNAME                6
 
 #define UCM_VERSION_MAJOR       3
 #define UCM_VERSION_MINOR       5
-#define UCM_VERSION_REVISION    5
-#define UCM_VERSION_BUILD       2103
-#define UCM_IS_VNEXT            TRUE
+#define UCM_VERSION_REVISION    8
+#define UCM_VERSION_BUILD       2112
 
 #define SUPRUNPROCESS_TIMEOUT_DEFAULT 12000
 
@@ -61,11 +57,28 @@
 //
 #define UACME_SHARED_BASE_ID        'sTlA'
 
+//
+// Trash end char.
+//
+#define UCM_TRASH_END_CHAR          L'~'
+
+//
+// WORD sized id list.
+//
 #define AKAGI_COMPLETION_EVENT_ID   'ab'
 #define AKAGI_SHARED_SECTION_ID     'cd'
 #define AKAGI_BDESCRIPTOR_NAME_ID   'ef'
 #define FUBUKI_SYNC_MUTEX_ID        'a1'
+#define FUBUKI_PCA_SECTION_ID       '0f'
+#define FUBUKI_PCA_EVENT_ID         '1f'
 
+#define FUBUKI_PCA_PAYLOAD_RUN      (0x1)
+#define FUBUKI_PCA_LOADER_RUN       (0x2)
+#define FUBUKI_PCA_ALL_RUN          (FUBUKI_PCA_PAYLOAD_RUN | FUBUKI_PCA_LOADER_RUN)
+
+//
+// Kamikaze consts
+//
 #define KAMIKAZE_MARKER             "https"
 #define WF_MSC                      L"wf.msc"
 
@@ -76,19 +89,22 @@
 #pragma region PYSH
 
 #define T_DISPLAY_CALIBRATION       L"Software\\Microsoft\\Windows NT\\CurrentVersion\\ICM\\Calibration"
-#define T_DOTNET_CLIENT             L"Software\\Microsoft\\Windows NT\\CurrentVersion\\KnownFunctionTableDlls"
-#define T_DOTNET_FULL               L"Software\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full"
+#define T_PCA_STORE                 L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Store"
+#define T_APPCOMPAT_LAYERS          L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers"
+#define T_PCA_PERSISTED             L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Persisted"
+#define T_APP_ASSOC_TOASTS          L"Software\\Microsoft\\Windows\\CurrentVersion\\ApplicationAssociationToasts"
 
+#define T_CURVER                    L"CurVer"
 #define T_MSSETTINGS                L"ms-settings"
 #define T_MSWINDOWSSTORE            L"ms-windows-store"
 #define T_CLASSESFOLDER             L"Folder"
-#define T_APPXPACKAGE               L"AppX82a6gwre4fdg3bt635tn5ctqjf8msdd2"
 #define T_LAUNCHERSYSTEMSETTINGS    L"Launcher.SystemSettings"
 
 #define ELLOCNAK_MSU                L"update.msu"
 #define RUN_CMD_COMMAND             L" /c start "
 
 #define T_APPXSVC                   L"AppXSvc"
+#define T_PCASVC                    L"PcaSvc"
 
 #pragma endregion
 
@@ -101,6 +117,7 @@
 #define T_URL_MS_WIN_STORE          L"URL:ms-windows-store"
 
 #define T_SDDL_ALL_FOR_EVERYONE     L"D:(A;;GA;;;WD)"
+#define T_SDDL_EVERYONE_FULL_ACCESS L"D:PAI(A;OICI;FA;;;WD)"
 #define T_WINDIR                    L"windir"
 #define T_SYSTEMROOT                L"systemroot"
 #define T_WINDOWSMEDIAPLAYER        L"Windows Media Player"
@@ -121,6 +138,8 @@
 #define FUBUKI_DEFAULT_ENTRYPOINT       "MpScanStart"
 #define FUBUKI_ENTRYPOINT_UIACCESS2     "MpScanControl"
 #define FUBUKI_ENTRYPOINT_SXS           "MpThreatOpen"
+#define FUBUKI_ENTRYPOINT_PCAEXE        "MpManagerStatusQuery"
+#define FUBUKI_ENTRYPOINT_PCADLL        "MpManagerStatusQueryEx"
 #pragma endregion
 
 //
@@ -128,17 +147,24 @@
 //
 #define APISET_KERNEL32LEGACY       L"api-ms-win-core-kernel32-legacy-l1.DLL"
 
-#define ACCESSIBILITY_NI_DLL        L"Accessibility.ni.dll"
 #define COMCTL32_DLL                L"comctl32.dll"
 #define DISMCORE_DLL                L"dismcore.dll"
 #define DUSER_DLL                   L"duser.dll"
 #define GDIPLUS_DLL                 L"GdiPlus.dll"
-#define MSCOREE_DLL                 L"MSCOREE.DLL"
-#define OLE32_DLL                   L"ole32.dll"
 #define OSKSUPPORT_DLL              L"OskSupport.dll"
+#define PCADM_DLL                   L"pcadm.dll"
 #define SHELL32_DLL                 L"shell32.dll"
 #define WINMM_DLL                   L"winmm.dll"
 #define WOW64LOG_DLL                L"wow64log.dll"
+
+//
+// Native image cache targets
+//
+#define ASSEMBLY_MMCEX              L"MMCEx"
+#define MMCEX_NI_DLL                L"MMCEx.ni.dll"
+#define MMCEX_NI_DLL_AUX            L"MMCEx.ni.dll.aux"
+
+#define ASSEMBLY_ACCESSIBILITY      L"Accessibility"
 
 //
 // Windows executables
@@ -147,7 +173,6 @@
 #define CLIPUP_EXE                  L"Clipup.exe"
 #define COMPUTERDEFAULTS_EXE        L"computerdefaults.exe"
 #define CONSENT_EXE                 L"consent.exe"
-#define DCOMCNFG_EXE                L"dcomcnfg.exe"
 #define DCCW_EXE                    L"dccw.exe"
 #define EVENTVWR_EXE                L"eventvwr.exe"
 #define EXPLORER_EXE                L"explorer.exe"
@@ -159,6 +184,7 @@
 #define PKGMGR_EXE                  L"pkgmgr.exe"
 #define SDCLT_EXE                   L"sdclt.exe"
 #define SLUI_EXE                    L"slui.exe"
+#define TASKHOSTW_EXE               L"taskhostw.exe"
 #define WINSAT_EXE                  L"winsat.exe"
 #define WINVER_EXE                  L"winver.exe"
 #define WSRESET_EXE                 L"WSReset.exe"
@@ -180,6 +206,7 @@
 #define NET2_DIR                    L"v2.0.50727"
 #define NET4_DIR                    L"v4.0.30319"
 #define MSNETFRAMEWORK_DIR          L"Microsoft.NET\\Framework"
+#define MMCEX_DIR                   L"\\MMCEx"
 
 //
 // Shell Verbs
@@ -195,11 +222,11 @@
 // Units specific values
 //
 #define MYSTERIOUSCUTETHING         L"pe386" //PYSH
+#define ABSOLUTEWIN                 L"lzx32" //PYSH
 
 //
 // SxS
 //
-
 #define LOCAL_SXS                   L".local"  //PYSH
 #define FAKE_LOCAL_SXS              L".@" //PYSH
 #define COMCTL32_SXS                L"microsoft.windows.common-controls"
@@ -252,57 +279,9 @@
 //
 #define T_ELEVATION_MONIKER_ADMIN            L"Elevation:Administrator!new:"
 
+
 //
-// Defines for Major Windows NT release builds
+// RPC interface UUID
 //
-
-// Windows 7 RTM
-#define NT_WIN7_RTM             7600
-
-// Windows 7 SP1
-#define NT_WIN7_SP1             7601
-
-// Windows 8 RTM
-#define NT_WIN8_RTM             9200
-
-// Windows 8.1
-#define NT_WIN8_BLUE            9600
-
-// Windows 10 TH1
-#define NT_WIN10_THRESHOLD1     10240
-
-// Windows 10 TH2
-#define NT_WIN10_THRESHOLD2     10586
-
-// Windows 10 RS1
-#define NT_WIN10_REDSTONE1      14393
-
-// Windows 10 RS2
-#define NT_WIN10_REDSTONE2      15063
-
-// Windows 10 RS3
-#define NT_WIN10_REDSTONE3      16299
-
-// Windows 10 RS4
-#define NT_WIN10_REDSTONE4      17134
-
-// Windows 10 RS5
-#define NT_WIN10_REDSTONE5      17763
-
-// Windows 10 19H1
-#define NT_WIN10_19H1           18362
-
-// Windows 10 19H2
-#define NT_WIN10_19H2           18363
-
-// Windows 10 20H1
-#define NT_WIN10_20H1           19041
-
-// Windows 10 20H2
-#define NT_WIN10_20H2           19042
-
-// Windows 10 21H1
-#define NT_WIN10_21H1           19043
-
-// Windows 10 Active Develepment Branch (21XX)
-#define NTX_WIN10_ADB           21323
+#define APPINFO_RPC                         TEXT("201ef99a-7fa0-444c-9399-19ba84f12a1a")
+#define PCASVC_RPC                          TEXT("0767a036-0d22-48aa-ba69-b619480f38cb")
